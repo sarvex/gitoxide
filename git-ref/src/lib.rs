@@ -14,8 +14,12 @@
 //!     * one reference maps to a file on disk
 //!   * **packed**
 //!     * references are stored in a single human-readable file, along with their targets if they are symbolic.
-//! * **ref-table**
-//!   * supersedes all of the above to allow handling hundreds of thousands of references.
+//!
+//! ## Feature Flags
+#![cfg_attr(
+    feature = "document-features",
+    cfg_attr(doc, doc = ::document_features::document_features!())
+)]
 #![deny(unsafe_code, missing_docs, rust_2018_idioms)]
 
 use std::borrow::Cow;
@@ -54,6 +58,8 @@ pub mod store {
     /// The way a file store handles the reflog
     #[derive(Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
     pub enum WriteReflog {
+        /// Always write the reflog for all references for ref edits, unconditionally.
+        Always,
         /// Write a ref log for ref edits according to the standard rules.
         Normal,
         /// Never write a ref log.
@@ -100,6 +106,7 @@ pub(crate) struct Store {
 /// Indicate that the given BString is a validate reference name or path that can be used as path on disk or written as target
 /// of a symbolic reference
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct FullName(pub(crate) BString);
 
 /// A validated and potentially partial reference name - it can safely be used for common operations.
@@ -177,6 +184,7 @@ pub enum Category<'a> {
 
 /// Denotes a ref target, equivalent to [`Kind`], but with mutable data.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub enum Target {
     /// A ref that points to an object id
     Peeled(ObjectId),

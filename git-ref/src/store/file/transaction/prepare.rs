@@ -59,7 +59,7 @@ impl<'s> Transaction<'s> {
                 )
                 .map_err(|err| Error::LockAcquire {
                     err,
-                    full_name: "borrowchk wont allow change.name()".into(),
+                    full_name: "borrowchk won't allow change.name()".into(),
                 })?;
                 let existing_ref = existing_ref?;
                 match (&expected, &existing_ref) {
@@ -105,7 +105,7 @@ impl<'s> Transaction<'s> {
                 )
                 .map_err(|err| Error::LockAcquire {
                     err,
-                    full_name: "borrowchk wont allow change.name() and this will be corrected by caller".into(),
+                    full_name: "borrowchk won't allow change.name() and this will be corrected by caller".into(),
                 })?;
 
                 let existing_ref = existing_ref?;
@@ -280,10 +280,7 @@ impl<'s> Transaction<'s> {
                     // no packed-ref file exists anyway
                     self.store
                         .assure_packed_refs_uptodate()?
-                        .map(|p| {
-                            p.into_transaction(lock_fail_mode)
-                                .map_err(Error::PackedTransactionAcquire)
-                        })
+                        .map(|p| buffer_into_transaction(p, lock_fail_mode).map_err(Error::PackedTransactionAcquire))
                         .transpose()?
                 };
                 if let Some(transaction) = packed_transaction {
@@ -437,4 +434,4 @@ mod error {
 
 pub use error::Error;
 
-use crate::transaction::PreviousValue;
+use crate::{packed::transaction::buffer_into_transaction, transaction::PreviousValue};

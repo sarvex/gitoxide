@@ -1,5 +1,6 @@
-use git_path::{realpath::Error, realpath_opts};
 use std::path::Path;
+
+use git_path::{realpath::Error, realpath_opts};
 use tempfile::tempdir;
 
 #[test]
@@ -44,9 +45,9 @@ fn assorted() -> crate::Result {
     );
 
     {
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(windows))]
         let absolute_path = Path::new("/c/d/.git");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let absolute_path = Path::new("C:\\c\\d\\.git");
         assert_eq!(
             realpath_opts(absolute_path, cwd, symlinks_disabled)?,
@@ -129,16 +130,16 @@ fn symlink_processing_is_disabled_if_the_value_is_zero() -> crate::Result {
 fn create_symlink(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
     std::fs::create_dir_all(from.as_ref().parent().unwrap())?;
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     {
         std::os::unix::fs::symlink(to, from)
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     std::os::windows::fs::symlink_file(to, from)
 }
 
 fn canonicalized_tempdir() -> crate::Result<tempfile::TempDir> {
-    let canonicalized_tempdir = git_path::realpath(std::env::temp_dir(), std::env::current_dir()?)?;
+    let canonicalized_tempdir = git_path::realpath(std::env::temp_dir())?;
     Ok(tempfile::tempdir_in(canonicalized_tempdir)?)
 }

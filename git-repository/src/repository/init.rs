@@ -8,6 +8,7 @@ impl crate::Repository {
         common_dir: Option<std::path::PathBuf>,
         config: crate::config::Cache,
         linked_worktree_options: crate::open::Options,
+        index: crate::worktree::IndexStorage,
     ) -> Self {
         crate::Repository {
             bufs: RefCell::new(Vec::with_capacity(4)),
@@ -25,7 +26,8 @@ impl crate::Repository {
             },
             refs,
             config,
-            linked_worktree_options,
+            options: linked_worktree_options,
+            index,
         }
     }
 

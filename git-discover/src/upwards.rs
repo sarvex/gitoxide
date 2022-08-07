@@ -102,7 +102,7 @@ fn parse_ceiling_dirs(ceiling_dirs: &[u8]) -> Vec<PathBuf> {
         }
 
         if should_normalize {
-            if let Ok(normalized) = git_path::realpath(&dir, "") {
+            if let Ok(normalized) = git_path::realpath(&dir) {
                 dir = Cow::Owned(normalized);
             }
         }
@@ -113,12 +113,13 @@ fn parse_ceiling_dirs(ceiling_dirs: &[u8]) -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod parse_ceiling_dirs {
-    use super::*;
 
     #[test]
     #[cfg(unix)]
     fn from_environment_format() -> std::io::Result<()> {
         use std::{fs, os::unix::fs::symlink};
+
+        use super::*;
 
         // Setup filesystem
         let dir = tempfile::tempdir().expect("success creating temp dir");
@@ -155,7 +156,7 @@ pub(crate) mod function {
     use git_sec::Trust;
 
     use super::{Error, Options};
-    use crate::is_git;
+    use crate::{is_git, DOT_GIT_DIR};
 
     /// Find the location of the git repository directly in `directory` or in any of its parent directories and provide
     /// an associated Trust level by looking at the git directory's ownership, and control discovery using `options`.
@@ -241,7 +242,7 @@ pub(crate) mod function {
 
             for append_dot_git in &[false, true] {
                 if *append_dot_git {
-                    cursor.push(".git");
+                    cursor.push(DOT_GIT_DIR);
                 }
                 if let Ok(kind) = is_git(&cursor) {
                     match filter_by_trust(&cursor)? {
@@ -302,7 +303,7 @@ pub(crate) mod function {
         }
 
         if let Some(cwd) = cwd {
-            debug_assert_eq!(cursor.file_name().and_then(|f| f.to_str()), Some(".git"));
+            debug_assert_eq!(cursor.file_name().and_then(|f| f.to_str()), Some(DOT_GIT_DIR));
             let parent = cursor.parent().expect(".git appended");
             cwd.strip_prefix(parent)
                 .ok()
@@ -312,7 +313,7 @@ pub(crate) mod function {
                     (relative_path_components * "..".len() < current_component_len).then(|| {
                         std::iter::repeat("..")
                             .take(relative_path_components)
-                            .chain(Some(".git"))
+                            .chain(Some(DOT_GIT_DIR))
                             .collect()
                     })
                 })

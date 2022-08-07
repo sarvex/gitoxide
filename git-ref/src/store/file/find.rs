@@ -36,7 +36,7 @@ impl file::Store {
         Error: From<E>,
     {
         let packed = self.assure_packed_refs_uptodate()?;
-        self.find_one_with_verified_input(partial.try_into()?, packed.as_deref())
+        self.find_one_with_verified_input(partial.try_into()?, packed.as_ref().map(|b| &***b))
     }
 
     /// Similar to [`file::Store::find()`] but a non-existing ref is treated as error.
@@ -225,7 +225,7 @@ impl file::Store {
                 Ok(buf.into())
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
-            #[cfg(target_os = "windows")]
+            #[cfg(windows)]
             Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => Ok(None),
             Err(err) => Err(err),
         }
@@ -255,7 +255,7 @@ pub mod existing {
             crate::name::Error: From<E>,
         {
             let packed = self.assure_packed_refs_uptodate().map_err(find::Error::PackedOpen)?;
-            self.find_existing_inner(partial, packed.as_deref())
+            self.find_existing_inner(partial, packed.as_ref().map(|b| &***b))
         }
 
         /// Similar to [`file::Store::find()`], but supports a stable packed buffer.
@@ -315,7 +315,7 @@ pub mod existing {
             #[allow(missing_docs)]
             pub enum Error {
                 Find(err: find::Error) {
-                    display("An error occured while trying to find a reference")
+                    display("An error occurred while trying to find a reference")
                     from()
                     source(err)
                 }
