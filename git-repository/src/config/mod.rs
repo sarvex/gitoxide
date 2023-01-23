@@ -10,6 +10,12 @@ pub use snapshot::credential_helpers;
 ///
 pub mod overrides;
 
+/// The tree of supported configuration values for use in [`config_overrides`][crate::open::Options::config_overrides()].
+///
+/// Use it to traverse all implemented keys and to validate values before usage as configuration overrides.
+pub mod tree;
+pub use tree::root::Tree;
+
 /// A platform to access configuration values as read from disk.
 ///
 /// Note that these values won't update even if the underlying file(s) change.
@@ -106,11 +112,8 @@ pub mod checkout_options {
     #[derive(Debug, thiserror::Error)]
     #[allow(missing_docs)]
     pub enum Error {
-        #[error("{key} could not be decoded")]
-        Configuration {
-            key: &'static str,
-            source: git_config::value::Error,
-        },
+        #[error(transparent)]
+        Configuration(super::key::Error<git_config::value::Error, 'n', 'd'>),
         #[error("Failed to interpolate the attribute file configured at `core.attributesFile`")]
         AttributesFileInterpolation(#[from] git_config::path::interpolate::Error),
     }
@@ -127,6 +130,45 @@ pub mod ssh_connect_options {
         #[error("The ssh variant named {name:?} at key `ssh.variant` is unknown.")]
         SshVariant { name: BString },
     }
+}
+
+///
+pub mod key {
+    use crate::bstr::BString;
+
+    const fn prefix(kind: char) -> &'static str {
+        match kind {
+            'n' => "",                       // nothing
+            't' => "The date format at key", // time
+            _ => panic!("BUG: invalid prefix kind - add a case for it here"),
+        }
+    }
+    const fn suffix(kind: char) -> &'static str {
+        match kind {
+            'd' => "could not be decoded", // decoding
+            'i' => "was invalid",          // invalid
+            _ => panic!("BUG: invalid suffix kind - add a case for it here"),
+        }
+    }
+    /// A generic error suitable to produce decent messages for all kinds of configuration errors with config-key granularity.
+    ///
+    /// This error is meant to be reusable and help produce uniform error messages related to parsing any configuration key.
+    #[derive(Debug, thiserror::Error)]
+    #[error("{} \"{key:?}\"{} {}", prefix(PREFIX), environment_override.as_deref().map(|var| format!(" (possibly from {var})")).unwrap_or_default(), suffix(SUFFIX))]
+    pub struct Error<E: std::error::Error + Send + Sync + 'static, const PREFIX: char, const SUFFIX: char> {
+        /// The configuration key that contained the value.
+        pub key: BString,
+        /// The associated environment variable that would override this value.
+        pub environment_override: Option<&'static str>,
+        /// The source of the error if there was one.
+        pub source: Option<E>,
+    }
+}
+
+///
+pub mod time {
+    /// The error produced when failing to parse time from configuration.
+    pub type Error = super::key::Error<git_date::parse::Error, 't', 'i'>;
 }
 
 ///

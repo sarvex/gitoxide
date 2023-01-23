@@ -154,10 +154,7 @@ mod branch {
             self.config
                 .resolved
                 .string("branch", Some(short_branch_name.into()), "merge")
-                .map(|v| match v {
-                    Cow::Borrowed(v) => v.try_into().map(Cow::Borrowed),
-                    Cow::Owned(v) => v.try_into().map(Cow::Owned),
-                })
+                .map(crate::config::tree::branch::Merge::try_into_fullrefname)
         }
 
         /// Returns the unvalidated name of the remote associated with the given `short_branch_name`,

@@ -2,8 +2,10 @@ use std::{borrow::Cow, convert::TryInto, path::PathBuf, time::Duration};
 
 use git_lock::acquire::Fail;
 
+use crate::config::tree::Key;
 use crate::{
     bstr::BStr,
+    config,
     config::{cache::util::ApplyLeniencyDefault, checkout_options, Cache},
     remote,
     repository::identity,
@@ -159,10 +161,11 @@ impl Cache {
             config.integer("checkout", None, "workers").map(|val| match val {
                 Ok(v) if v < 0 => Ok(0),
                 Ok(v) => Ok(v.try_into().expect("positive i64 can always be usize on 64 bit")),
-                Err(err) => Err(checkout_options::Error::Configuration {
-                    key: "checkout.workers",
-                    source: err,
-                }),
+                Err(err) => Err(checkout_options::Error::Configuration(config::key::Error {
+                    key: config::tree::Checkout::WORKERS.logical_name().into(),
+                    environment_override: None,
+                    source: Some(err),
+                })),
             })
         }
 
@@ -173,9 +176,12 @@ impl Cache {
             assert!(tokens.next().is_none(), "core.<key>");
             Ok(me
                 .apply_leniency(me.resolved.boolean(section, None, key))
-                .map_err(|err| checkout_options::Error::Configuration {
-                    key: full_key,
-                    source: err,
+                .map_err(|err| {
+                    checkout_options::Error::Configuration(config::key::Error {
+                        key: full_key.into(),
+                        source: Some(err),
+                        environment_override: None,
+                    })
                 })?
                 .unwrap_or(default))
         }
