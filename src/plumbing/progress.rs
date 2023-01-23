@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
 use crosstermion::crossterm::style::Stylize;
+use git_repository as git;
 use owo_colors::OwoColorize;
 use tabled::{Style, TableIteratorExt, Tabled};
 
@@ -14,10 +15,7 @@ enum Usage {
     /// We definitely want to implement this configuration value.
     Planned { note: Option<&'static str> },
     /// The configuration is already effective and used (at least) in the given module `name`.
-    InModule {
-        name: &'static str,
-        deviation: Option<&'static str>,
-    },
+    InModule { deviation: Option<&'static str> },
     /// Needs analysis, unclear how it works or what it does.
     Puzzled,
 }
@@ -38,10 +36,9 @@ impl Display for Usage {
                     write!(f, " ℹ {} ℹ", note.bright_white())?;
                 }
             }
-            InModule { name, deviation } => {
-                write!(f, "mod {name}")?;
+            InModule { deviation } => {
                 if let Some(deviation) = deviation {
-                    write!(f, "{}", format!(" ❗️{deviation}❗️").bright_white())?
+                    write!(f, "{}", format!("❗️{deviation}❗️").bright_white())?
                 }
             }
         }
@@ -108,15 +105,15 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "core.sshCommand",
-        usage: InModule { name: "repository::config", deviation: None }
+        usage: InModule { deviation: None }
     },
     Record {
         config: "ssh.variant",
-        usage: InModule { name: "repository::config", deviation: Some("We error if a variant is chosen that we don't know, as opposed to defaulting to 'ssh'") }
+        usage: InModule { deviation: Some("We error if a variant is chosen that we don't know, as opposed to defaulting to 'ssh'") }
     },
     Record {
         config: "core.fileMode",
-        usage: InModule {name: "config", deviation: None},
+        usage: InModule {deviation: None},
     },
     Record {
         config: "core.hideDotFiles",
@@ -132,7 +129,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "core.symlinks",
-        usage: InModule {name: "config", deviation: None},
+        usage: InModule {deviation: None},
     },
     Record {
         config: "core.packedGitWindowSize",
@@ -145,7 +142,6 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "core.deltaBaseCacheLimit",
         usage: InModule {
-            name: "repository::cache",
             deviation: Some("if unset, we default to a small 64 slot fixed-size cache that holds at most 64 full delta base objects of any size. Overridable by 'GITOXIDE_PACK_CACHE_MEMORY'. Set to 0 to deactivate it entirely.")
         }
     },
@@ -163,11 +159,11 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "core.ignorecase",
-        usage: InModule {name: "config", deviation: None}
+        usage: InModule {deviation: None}
     },
     Record {
         config: "core.precomposeUnicode",
-        usage: InModule {name: "config", deviation: Some("This must be explicitly handled when data is coming into the program to fully work")}
+        usage: InModule {deviation: Some("This must be explicitly handled when data is coming into the program to fully work")}
     },
     Record {
         config: "core.protectHFS",
@@ -199,7 +195,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "checkout.workers",
-        usage: InModule {name: "clone::checkout", deviation: Some("if unset, uses all cores instead of just one")},
+        usage: InModule {deviation: Some("if unset, uses all cores instead of just one")},
     },
     Record {
         config: "checkout.thresholdForParallelism",
@@ -236,27 +232,6 @@ static GIT_CONFIG: &[Record] = &[
         },
     },
     Record {
-        config: "branch.<name>.remote",
-        usage: InModule {
-            name: "reference::remote",
-            deviation: None
-        },
-    },
-    Record {
-        config: "branch.<name>.pushRemote",
-        usage: InModule {
-            name: "reference::remote",
-            deviation: None
-        },
-    },
-    Record {
-        config: "branch.<name>.merge",
-        usage: InModule {
-            name: "repository::config",
-            deviation: None
-        },
-    },
-    Record {
         config: "branch.<name>.rebase",
         usage: Planned {
             note: Some("for when we can merge, rebase should be supported")
@@ -271,14 +246,12 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "core.bare",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
     Record {
         config: "core.excludesFile",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
@@ -289,35 +262,30 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "core.abbrev",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
     Record {
         config: "core.askPass",
         usage: InModule {
-            name: "config::snapshot::credential_helpers",
             deviation: None,
         },
     },
     Record {
         config: "core.ignoreCase",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
     Record {
         config: "core.multiPackIndex",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
     Record {
         config: "core.disambiguate",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
@@ -327,34 +295,31 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "core.filesRefLockTimeout",
-        usage: InModule {name: "config::cache::access", deviation: None},
+        usage: InModule {deviation: None},
     },
     Record {
         config: "core.packedRefsTimeout",
-        usage: InModule {name: "config::cache::access", deviation: None},
+        usage: InModule {deviation: None},
     },
     Record {
         config: "core.logAllRefUpdates",
         usage: InModule {
-            name: "config::cache",
             deviation: None,
         },
     },
     Record {
         config: "core.repositoryFormatVersion",
         usage: InModule {
-            name: "config::cache::incubate",
             deviation: None,
         },
     },
     Record {
         config: "diff.algorithm",
-        usage: InModule {name: "config::cache::access", deviation: Some("'patience' diff is not implemented and can default to 'histogram' if lenient config is used, and defaults to histogram if unset for fastest and best results")},
+        usage: InModule {deviation: Some("'patience' diff is not implemented and can default to 'histogram' if lenient config is used, and defaults to histogram if unset for fastest and best results")},
     },
     Record {
         config: "extensions.objectFormat",
         usage: InModule {
-            name: "config::cache::incubate",
             deviation: Some(
                 "Support for SHA256 is prepared but not fully implemented yet. For now we abort when encountered.",
             ),
@@ -367,44 +332,14 @@ static GIT_CONFIG: &[Record] = &[
         },
     },
     Record {
-        config: "committer.name",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("overridden by 'GIT_COMMITTER_NAME'"),
-        },
-    },
-    Record {
-        config: "committer.email",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("overridden by 'GIT_COMMITTER_EMAIL'"),
-        },
-    },
-    Record {
-        config: "author.name",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("overridden by 'GIT_AUTHOR_NAME'"),
-        },
-    },
-    Record {
-        config: "author.email",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("overridden by 'GIT_AUTHOR_EMAIL'"),
-        },
-    },
-    Record {
         config: "user.name",
         usage: InModule {
-            name: "repository::identity",
             deviation: Some("defaults to 'gitoxide'"),
         },
     },
     Record {
         config: "user.email",
         usage: InModule {
-            name: "repository::identity",
             deviation: Some("defaults to 'gitoxide@localhost'"),
         },
     },
@@ -417,7 +352,6 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "clone.defaultRemoteName",
         usage: InModule {
-            name: "clone::prepare",
             deviation: None
         },
     },
@@ -488,35 +422,30 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "init.defaultBranch",
         usage: InModule {
-            name: "init",
             deviation: Some("If unset, we default to 'main' instead of 'master'")
         },
     },
     Record {
         config: "pack.threads",
         usage: InModule {
-            name: "remote::connection::fetch",
             deviation: Some("if unset, it uses all threads as opposed to just 1"),
         },
     },
     Record {
         config: "pack.indexVersion",
         usage: InModule {
-            name: "remote::connection::fetch",
             deviation: None,
         },
     },
     Record {
         config: "protocol.allow",
         usage: InModule {
-            name: "remote::url::scheme_permission",
             deviation: None,
         },
     },
     Record {
         config: "protocol.<name>.allow",
         usage: InModule {
-            name: "remote::url::scheme_permission",
             deviation: None,
         },
     },
@@ -529,14 +458,12 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "url.<base>.insteadOf",
         usage: InModule {
-            name: "remote::url::rewrite",
             deviation: None,
         },
     },
     Record {
         config: "url.<base>.pushInsteadOf",
         usage: InModule {
-            name: "remote::url::rewrite",
             deviation: None,
         },
     },
@@ -574,15 +501,15 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.proxy",
-        usage: InModule { name: "repository::config::transport", deviation: Some("ignores strings with illformed UTF-8") }
+        usage: InModule { deviation: Some("ignores strings with illformed UTF-8") }
     },
     Record {
         config: "http.extraHeader",
-        usage: InModule { name: "repository::config::transport", deviation: Some("ignores strings with illformed UTF-8") }
+        usage: InModule { deviation: Some("ignores strings with illformed UTF-8") }
     },
     Record {
         config: "http.proxyAuthMethod",
-        usage: InModule { name: "repository::config::transport", deviation: Some("implemented like git, but I never tried it so who knows") },
+        usage: InModule { deviation: Some("implemented like git, but I never tried it so who knows") },
     },
     Record {
         config: "http.proxySSLCert",
@@ -618,7 +545,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.version",
-        usage: InModule { name: "repository::config::transport", deviation: None }
+        usage: InModule { deviation: None }
     },
     Record {
         config: "http.curloptResolve",
@@ -626,7 +553,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.sslVersion",
-        usage: InModule { name: "repository::config::transport", deviation: Some("Adds a new 'default' value to keep the implementation default explicitly.") }
+        usage: InModule { deviation: Some("Adds a new 'default' value to keep the implementation default explicitly.") }
     },
     Record {
         config: "http.sslCipherList",
@@ -658,7 +585,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.sslCAInfo",
-        usage: InModule { name: "repository::config::transport", deviation: None }
+        usage: InModule { deviation: None }
     },
     Record {
         config: "http.sslCAPath",
@@ -674,7 +601,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.schannelUseSSLCAInfo",
-        usage: InModule { name: "repository::config::transport", deviation: Some("only used as switch internally to turn off using the sslCAInfo, unconditionally. If unset, it has no effect, whereas in `git` it defaults to false.") }
+        usage: InModule { deviation: Some("only used as switch internally to turn off using the sslCAInfo, unconditionally. If unset, it has no effect, whereas in `git` it defaults to false.") }
     },
     Record {
         config: "http.pinnedPubkey",
@@ -698,15 +625,15 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.lowSpeedLimit",
-        usage: InModule { name: "repository::config::transport", deviation: Some("fails on negative values") }
+        usage: InModule { deviation: Some("fails on negative values") }
     },
     Record {
         config: "http.lowSpeedTime",
-        usage: InModule { name: "repository::config::transport", deviation: Some("fails on negative values") }
+        usage: InModule { deviation: Some("fails on negative values") }
     },
     Record {
         config: "http.userAgent",
-        usage: InModule { name: "repository::config::transport", deviation: Some("ignores strings with illformed UTF-8") }
+        usage: InModule { deviation: Some("ignores strings with illformed UTF-8") }
     },
     Record {
         config: "http.noEPSV",
@@ -714,7 +641,7 @@ static GIT_CONFIG: &[Record] = &[
     },
     Record {
         config: "http.followRedirects",
-        usage: InModule { name: "repository::config::transport", deviation: None }
+        usage: InModule { deviation: None }
     },
     Record {
         config: "http.<url>.*",
@@ -751,161 +678,102 @@ static GIT_CONFIG: &[Record] = &[
     Record {
         config: "remote.<name>.tagOpt",
         usage: InModule {
-            name: "repository::remote",
             deviation: None
         }
     },
     Record {
         config: "gitoxide.userAgent",
         usage: InModule {
-            name: "config::cache",
             deviation: Some("The user agent presented on the git protocol layer, serving as fallback for when no http.userAgent is set.")
         }
     },
     Record {
         config: "gitoxide.https.proxy",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("Used only if the url to access is https, created from 'HTTPS_PROXY' and 'https_proxy' env-vars")
         }
     },
     Record {
         config: "gitoxide.http.proxy",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("created from 'http_proxy' env-var.")
         }
     },
     Record {
         config: "gitoxide.http.allProxy",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("created from 'all_proxy' or 'ALL_PROXY' env-var.")
         }
     },
     Record {
         config: "gitoxide.http.verbose",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("created from 'GIT_CURL_VERBOSE' to print debug output to stderr.")
         }
     },
     Record {
         config: "gitoxide.http.noProxy",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("created from 'no_proxy' or 'NO_PROXY' env-var.")
         }
     },
     Record {
         config: "gitoxide.http.multiplexing",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("Takes boolean true or false values, default true, and can take effect only if `http.version` is set to 'HTTP/2'")
         }
     },
     Record {
         config: "gitoxide.http.connectTimeout",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("entirely new, and in milliseconds like all other timeout suffixed variables in the git config")
         }
     },
     Record {
         config: "gitoxide.http.sslVersionMin",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("entirely new to set the lower bound for the allowed ssl version range. Overwrites the min bound of `http.sslVersion` if set. Min and Max must be set to become effective.")
         }
     },
     Record {
         config: "gitoxide.http.sslVersionMax",
         usage: InModule {
-            name: "repository::config::transport",
             deviation: Some("entirely new to set the upper bound for the allowed ssl version range. Overwrites the max bound of `http.sslVersion` if set. Min and Max must be set to become effective.")
         }
     },
     Record {
         config: "gitoxide.allow.protocolFromUser",
         usage: InModule {
-            name: "remote::url::scheme_permission",
             deviation: Some("corresponds to GIT_PROTOCOL_FROM_USER environment variable")
         }
     },
     Record {
         config: "gitoxide.objects.replaceRefBase",
         usage: InModule {
-            name: "open",
             deviation: Some("corresponds to the GIT_REPLACE_REF_BASE environment variable")
         }
     },
     Record {
         config: "gitoxide.objects.noReplace",
         usage: InModule {
-            name: "open",
             deviation: Some("corresponds to the GIT_NO_REPLACE_OBJECTS environment variable")
-        }
-    },
-    Record {
-        config: "gitoxide.commit.authorDate",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_AUTHOR_DATE environment variable")
-        }
-    },
-    Record {
-        config: "gitoxide.commit.committerDate",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_COMMITTER_DATE environment variable")
-        }
-    },
-    Record {
-        config: "gitoxide.author.nameFallback",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_AUTHOR_NAME environment variable and is a fallback for `author.name`")
-        }
-    },
-    Record {
-        config: "gitoxide.author.emailFallback",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_AUTHOR_EMAIL environment variable and is a fallback for `author.email`")
-        }
-    },
-    Record {
-        config: "gitoxide.committer.nameFallback",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_COMMITTER_NAME environment variable and is a fallback for `committer.name`")
-        }
-    },
-    Record {
-        config: "gitoxide.committer.emailFallback",
-        usage: InModule {
-            name: "repository::identity",
-            deviation: Some("corresponds to the GIT_COMMITTER_EMAIL environment variable and is a fallback for `committer.email`")
         }
     },
     Record {
         config: "gitoxide.user.emailFallback",
         usage: InModule {
-            name: "repository::identity",
             deviation: Some("corresponds to the EMAIL environment variable and is a fallback for `user.email`")
         }
     },
     Record {
         config: "gitoxide.ssh.commandWithoutShellFallback",
         usage: InModule {
-            name: "repository::config",
             deviation: Some("Corresponds to the value of `GIT_SSH` and is always executed without shell and treated as fallback.")
         }
     },
     Record {
         config: "gitoxide.objects.cacheLimit",
         usage: InModule {
-            name: "repository::cache",
             deviation: Some("corresponds to the GITOXIDE_OBJECT_CACHE_MEMORY environment variable. If unset or 0, there is no object cache")
         }
     },
@@ -915,7 +783,29 @@ static GIT_CONFIG: &[Record] = &[
 pub fn show_progress() -> anyhow::Result<()> {
     let sorted = {
         let mut v: Vec<_> = GIT_CONFIG.into();
+        v.extend(git::config::Tree.sections().iter().flat_map(|section| {
+            fn to_record(key: &dyn git::config::tree::Key) -> Record {
+                let config = key.logical_name();
+                let deviation = key
+                    .link()
+                    .map(|link| match link {
+                        git::config::tree::Link::FallbackKey(key) => format!("fallback is '{}'", key.logical_name()),
+                        git::config::tree::Link::EnvironmentOverride(name) => format!("overridden by '{name}'"),
+                    })
+                    .map(|d| &*Box::leak(d.into_boxed_str()));
+                Record {
+                    config: Box::leak(config.into_boxed_str()),
+                    usage: InModule { deviation },
+                }
+            }
+            section
+                .sub_sections()
+                .iter()
+                .flat_map(|sub_section| sub_section.keys().iter().map(|key| to_record(*key)))
+                .chain(section.keys().iter().map(|key| to_record(*key)))
+        }));
         v.sort_by_key(|r| r.config);
+        v.dedup_by_key(|r| r.config);
         v
     };
 
@@ -924,12 +814,10 @@ pub fn show_progress() -> anyhow::Result<()> {
         "\nTotal records: {} ({perfect_icon} = {perfect}, {deviation_icon} = {deviation}, {planned_icon} = {planned}, {ondemand_icon} = {ondemand}, {not_applicable_icon} = {not_applicable})",
         GIT_CONFIG.len(),
         perfect_icon = InModule {
-            name: "",
             deviation: None
         }
         .icon(),
         deviation_icon = InModule {
-            name: "",
             deviation: Some("")
         }
         .icon(),
